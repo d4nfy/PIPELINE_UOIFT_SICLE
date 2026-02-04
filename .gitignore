@@ -1,0 +1,33 @@
+# python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# tests and mockup (dev only)
+**/tests/
+**/mockup/
+
+# paper (overleaf)
+paper/
+
+# generated pipeline outputs
+**/pipeline_output/
+**/test_output/
+**/batch_results*/
+
+outputs/**/*.npy
+outputs/**/*.rar
+
+# environment / secrets
+.env
+.env.*
+
+# python packaging
+*.egg-info/
+dist/
+build/
+
+# ide / tools
+.vscode/
+.idea/
+
