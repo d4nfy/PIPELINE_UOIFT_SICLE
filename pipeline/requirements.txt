@@ -1,0 +1,15 @@
+# core dependencies
+numpy>=1.24.0
+scipy>=1.11.0
+scikit-image>=0.21.0
+imageio>=2.30.0
+Pillow>=10.0.0
+opencv-python>=4.8.0
+
+# stardist and deep learning
+stardist
+tensorflow
+csbdeep
+
+# cellpose for benchmark
+cellpose>=4.0

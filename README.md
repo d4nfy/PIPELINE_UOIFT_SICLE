@@ -1,77 +1,99 @@
 # Nuclei Segmentation Pipeline
 
 Hybrid superpixel-based nuclei segmentation for H&E oral histology images.
-Combines UOIFT saliency, dual-path SICLE superpixels, Veta-inspired filtering, and StarDist anchor detection.
+Combines UOIFT boundary saliency, dual-path SICLE superpixels, Veta-inspired filtering, and StarDist anchor-based arbitration.
+
+Dataset: 30 oral lesion histology images (2048x1532 px, 6 tissue categories), PUC Minas Odontology Lab, Belo Horizonte.
 
 ## Structure
 
 ```
-final/
-├── uoift_sicle/          # main pipeline
-│   ├── core/             # shared modules (config, wrappers, filtering)
-│   ├── batch/            # runners for 10 images
-│   ├── visualization/    # figure generation
-│   ├── benchmark/        # cellpose comparison
-│   └── tests/            # import verification
+PIPELINE_UOIFT_SICLE/
+├── pipeline/                        # 30-image benchmark
+│   ├── run.py                       # main entry (4 methods, --method flag)
+│   ├── prepare_new_images.py        # dataset preparation (tif -> png + metadata)
+│   ├── requirements.txt
+│   ├── setup_env.sh
+│   ├── ARCHITECTURE_OPTIONS.md      # pipeline flow diagrams and parameters
+│   └── core/                        # shared pipeline modules
+│       ├── uoift_saliency_light.py  # vectorized UOIFT saliency (sec 2.1.1)
+│       ├── uoift_saliency_python.py # original UOIFT saliency (sec 2.1.1)
+│       ├── sicle_wrapper.py         # SICLE C binary wrapper (sec 2.1.2)
+│       ├── veta_filtering.py        # chromatic + morphological filtering (sec 2.2)
+│       ├── stardist_wrapper.py      # StarDist anchor detection (sec 2.3)
+│       └── config.py                # all pipeline parameters
 │
-├── higra_sicle/          # deprecated (higra saliency variant)
-│
-├── paper/                # latex article
-│   └── overleaf_paper.tex
-│
-└── outputs/              # pre-computed results
+└── unused/                          # legacy code
+    ├── higra_sicle/                 # deprecated (higra saliency variant)
+    └── uoift_sicle_virginia/        # Virginia dataset (10 images)
 ```
 
 ## Quick start
 
 ```bash
-# recommended: no-saliency variant (2.4x faster, -0.4% quality)
-cd uoift_sicle/batch/
-python run_no_saliency.py
+cd pipeline
+./setup_env.sh
+source venv/bin/activate
 
-# full pipeline with uoift saliency
-cd uoift_sicle/batch/
-python run_config1_config2.py
+# 1. prepare dataset (converts tif images to png, creates metadata.json)
+python prepare_new_images.py
 
-# single image with argparse
-python run_single_image.py path/to/image.png --output logs/
-
-# generate all visualizations
-cd uoift_sicle/visualization/
-python generate_all.py
-
-# run import verification
-cd uoift_sicle/
-python tests/test_imports.py
+# 2. run benchmark
+python run.py                        # all 4 methods
+python run.py --method stardist      # stardist only
+python run.py --method cellpose      # sam-cellpose only
+python run.py --method boundary_aware  # with uoift saliency (best quality)
+python run.py --method modular       # without saliency (faster)
 ```
+
+Input images go in `../new_images/<category>/` (tif format, organized by tissue category).
+Results are written to `../new_images_results/`.
 
 ## Paper to code mapping
 
 | Paper section | Topic | Code module |
-|---------------|-------|-------------|
-| sec 3.1 | pipeline overview | `core/__init__.py` |
-| sec 3.2 | uoift saliency (eq. 1, alpha=-0.7) | `core/uoift_wrapper.py`, `core/uoift_saliency_python.py` |
-| sec 3.3 | dual-path sicle (path a coarse, path b multiscale) | `core/sicle_wrapper.py`, `core/config.py` |
-| sec 3.4 | veta filtering (solidity, lab, area, kdtree) | `core/veta_filtering.py` |
-| sec 3.5 | stardist anchor + iou arbitration | `core/stardist_wrapper.py`, `core/veta_filtering.py` |
-| sec 4.1 | dataset (10 oral histology images, 1920x1200, 40x) | `core/config.py` (ALL_IMAGES) |
+|---|---|---|
+| Sec 2.1.1 | Boundary-Aware Saliency (UOIFT, alpha=-0.7) | `pipeline/core/uoift_saliency_light.py` |
+| Sec 2.1.2 | Modular Dual-Path (SICLE coarse + multiscale) | `pipeline/core/sicle_wrapper.py`, `pipeline/core/config.py` |
+| Sec 2.2 | Chromatic & Morphological Filtering (Veta) | `pipeline/core/veta_filtering.py` |
+| Sec 2.3 | Anchor-Based Arbitration (StarDist + IoU) | `pipeline/core/stardist_wrapper.py` |
 
-## Results summary
+## Results (30 oral lesion histology images)
 
-| Configuration | Avg nuclei | Time/image | Notes |
-|---------------|-----------|------------|-------|
-| Cellpose (ref) | 691 | 600s | deep learning baseline |
-| StarDist alone | 638 | 3.3s | fast convex detector |
-| SICLE alone | 1799 | 58s | over-segmentation |
-| Config1 (best) | 916 | 149s | both paths on original |
-| No-saliency | 818 | 93s | skip uoift, 2.4x faster |
+6 tissue categories of increasing difficulty:
+normal mucosa, mild dysplasia, moderate dysplasia, severe dysplasia, carcinoma in situ, CCE (OSCC).
+
+### Overall
+
+| Method | Avg nuclei | Time/image | Explainable |
+|---|---|---|---|
+| SAM-Cellpose (ref) | 453 | 832s | No (DL) |
+| StarDist (baseline) | 574 | 2.9s | Partial |
+| **Boundary aware** | **660** | **48.3s** | **Yes** |
+| Modular dual-path | 653 | 44.6s | Yes |
+
+### Per-category (5 images each, boundary aware)
+
+| Category | SAM-Cellpose | StarDist | Boundary aware | Difficulty |
+|---|---|---|---|---|
+| Normal mucosa | 400 | 500 | 529 | Easiest |
+| Mild dysplasia | 523 | 612 | 737 | Easy |
+| Moderate dysplasia | 548 | 622 | 734 | Medium |
+| Severe dysplasia | 470 | 657 | 701 | Hard |
+| Carcinoma in situ | 600 | 787 | 880 | Hard |
+| CCE (OSCC) | 177 | 267 | 380 | Hardest |
 
 ## Dependencies
 
 ```
-numpy, scikit-image, scipy, imageio, higra>=0.6
-stardist>=0.8, tensorflow
-cellpose>=3.0  (benchmark only)
+numpy, scikit-image, scipy, Pillow, imageio, opencv-python
+stardist, tensorflow, csbdeep
+cellpose>=4.0 (benchmark only)
 ```
 
-WSL2 required for SICLE and UOIFT C binaries.
+### SICLE C binary
+
+Compile with `make` in the SICLE/ source directory.
+
+- **macOS/Linux**: runs natively, images auto-converted to PPM/PGM (compiled without libpng)
+- **Windows**: runs via WSL2, images passed as PNG with WSL path conversion

@@ -3,20 +3,22 @@ __pycache__/
 *.pyc
 *.pyo
 
-# tests and mockup (dev only)
-**/tests/
-**/mockup/
+# virtual environment
+venv/
+
+# SICLE C source (managed separately)
+SICLE/
 
 # paper (overleaf)
 paper/
+PAPER/
 
 # generated pipeline outputs
 **/pipeline_output/
 **/test_output/
 **/batch_results*/
 
-outputs/**/*.npy
-outputs/**/*.rar
+outputs/
 
 # environment / secrets
 .env
@@ -31,3 +33,14 @@ build/
 .vscode/
 .idea/
 
+# macOS
+.DS_Store
+
+# large data
+*.zip
+*.npy
+paper_stats.json
+
+# tests and mockup (dev only)
+**/tests/
+**/mockup/
